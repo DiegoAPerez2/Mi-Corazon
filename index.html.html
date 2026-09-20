@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Corazón Cósmico Eterno</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            overflow: hidden;
+            background-color: #020005;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            width: 100%;
+            height: 100%;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #instruction {
+            position: absolute;
+            bottom: 35px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            pointer-events: none;
+            user-select: none;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            z-index: 10;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+        /* Mensajes Estándar */
+        .love-message {
+            position: absolute;
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 13px;
+            pointer-events: none;
+            white-space: nowrap;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(255, 20, 147, 0.08); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 7px 18px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 20, 147, 0.35);
+            box-shadow: 0 0 25px rgba(255, 20, 147, 0.25), inset 0 0 10px rgba(255, 255, 255, 0.05);
+            opacity: 0;
+            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 5;
+            letter-spacing: 0.5px;
+        }
+        /* MENSAJE ESPECIAL: Estilo Premium Destacado */
+        .special-love-message {
+            position: absolute;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 14px;
+            pointer-events: none;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(255, 20, 147, 0.25), rgba(255, 215, 0, 0.15));
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            padding: 9px 22px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 215, 0, 0.6); /* Borde dorado suave */
+            box-shadow: 0 0 35px rgba(255, 20, 147, 0.45), inset 0 0 15px rgba(255, 215, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            z-index: 6;
+            letter-spacing: 0.8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="instruction">Órbita con el mouse • Descubre la estrella maestra</div>
+    <div id="labels-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const CONFIG = {
+            count: 32000, 
+            size: 0.035,  
+            lovePhrases: [
+                "Te amo",
+                "Eres muy especial para mí",
+                "Mi universo entero",
+                "Contigo el mundo es mejor",
+                "Eres mi estrella favorita",
+                "Cada día te elijo a ti",
+                "Haces latir mi corazón",
+                "Mi lugar seguro",
+                "Gracias por existir",
+                "Tú y yo, siempre",
+                "Amor infinito"
+            ]
+        };
+
+        let scene, camera, renderer, controls, galaxyPoints, messageStarsMesh;
+        let messageStarsData = [];
+        
+        // Variables para la estrella ultra especial
+        let specialStarMesh;
+        let specialStarData = null;
+        
+        const clock = new THREE.Clock();
+
+        window.onload = function() {
+            init();
+            animate();
+        };
+
+        function createCircularGlowTexture(baseColor = 'rgba(255, 20, 147, 0.3)') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.9)');
+            gradient.addColorStop(0.5, baseColor);
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2('#020005', 0.07);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 4.5, 7);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.04;
+            controls.maxDistance = 11;
+            controls.minDistance = 1.5;
+
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(CONFIG.count * 3);
+            const colors = new Float32Array(CONFIG.count * 3);
+
+            const colorCore = new THREE.Color('#ffffff');
+            const colorInside = new THREE.Color('#ff007f');  
+            const colorOutside = new THREE.Color('#9400d3'); 
+
+            for (let i = 0; i < CONFIG.count; i++) {
+                const i3 = i * 3;
+                const t = (Math.random() - 0.5) * Math.PI * 2;
+                
+                let hX = 16 * Math.pow(Math.sin(t), 3) * 0.13;
+                let hZ = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 0.13;
+
+                const rFactor = Math.pow(Math.random(), 1.8);
+                
+                if (i < CONFIG.count * 0.85) {
+                    positions[i3]     = hX * (0.2 + rFactor * 0.8) + (Math.random() - 0.5) * 0.12;
+                    positions[i3 + 1] = (Math.random() - 0.5) * 0.25 * (1.1 - rFactor);
+                    positions[i3 + 2] = hZ * (0.2 + rFactor * 0.8) + (Math.random() - 0.5) * 0.12;
+                } else {
+                    const radius = 1.0 + Math.random() * 4.0;
+                    positions[i3]     = Math.cos(t + radius * 0.5) * radius + (Math.random() - 0.5) * 0.4;
+                    positions[i3 + 1] = (Math.random() - 0.5) * 0.6;
+                    positions[i3 + 2] = Math.sin(t + radius * 0.5) * radius + (Math.random() - 0.5) * 0.4;
+                }
+
+                const mixedColor = colorInside.clone();
+                mixedColor.lerp(colorOutside, rFactor * 0.5);
+                
+                const distanceToCenter = Math.sqrt(positions[i3]*positions[i3] + positions[i3+2]*positions[i3+2]);
+                if (distanceToCenter < 0.8) {
+                    mixedColor.lerp(colorCore, 1.0 - (distanceToCenter / 0.8));
+                }
+
+                colors[i3]     = mixedColor.r;
+                colors[i3 + 1] = mixedColor.g;
+                colors[i3 + 2] = mixedColor.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const starTexture = createCircularGlowTexture('rgba(255, 20, 147, 0.3)');
+
+            const material = new THREE.PointsMaterial({
+                size: CONFIG.size,
+                sizeAttenuation: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                map: starTexture
+            });
+
+            galaxyPoints = new THREE.Points(geometry, material);
+            scene.add(galaxyPoints);
+
+            // Generar balizas estándar y la baliza maestra
+            createMessages(starTexture);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createMessages(starTexture) {
+            messageStarsMesh = new THREE.Group();
+            const labelsContainer = document.getElementById('labels-container');
+            const count = CONFIG.lovePhrases.length;
+
+            // 1. Mensajes normales distribuidos
+            CONFIG.lovePhrases.forEach((phrase, i) => {
+                const t = (i / count) * Math.PI * 2;
+                const hX = 16 * Math.pow(Math.sin(t), 3) * 0.13 * 0.85;
+                const hZ = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) * 0.13 * 0.85;
+                const y = (Math.random() - 0.5) * 0.1;
+
+                const div = document.createElement('div');
+                div.className = 'love-message';
+                div.textContent = phrase;
+                labelsContainer.appendChild(div);
+
+                const starGeo = new THREE.BufferGeometry();
+                starGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([hX, y, hZ]), 3));
+
+                const starMat = new THREE.PointsMaterial({
+                    color: 0xffb7c5, 
+                    size: 0.18,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    map: starTexture
+                });
+
+                const starPoint = new THREE.Points(starGeo, starMat);
+                
+                messageStarsData.push({
+                    position: new THREE.Vector3(hX, y, hZ),
+                    element: div
+                });
+
+                messageStarsMesh.add(starPoint);
+            });
+            scene.add(messageStarsMesh);
+
+            // 2. CREACIÓN DE LA ESTRELLA MADRE "TE AMO CON MI VIDA CACHETONA"
+            // Ubicada matemáticamente en el lóbulo superior izquierdo del corazón (t = -1.2)
+            const sT = -1.2;
+            const sX = 16 * Math.pow(Math.sin(sT), 3) * 0.13 * 0.95;
+            const sZ = -(13 * Math.cos(sT) - 5 * Math.cos(2*sT) - 2 * Math.cos(3*sT) - Math.cos(4*sT)) * 0.13 * 0.95;
+            const sY = 0.05; // Levemente sobreelevada en el plano para destacar
+
+            const specialDiv = document.createElement('div');
+            specialDiv.className = 'special-love-message';
+            specialDiv.textContent = "Te amo con mi vida cachetona";
+            labelsContainer.appendChild(specialDiv);
+
+            const specialStarGeo = new THREE.BufferGeometry();
+            specialStarGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([sX, sY, sZ]), 3));
+
+            // Textura con brillo dorado/oro rosa exclusivo
+            const goldStarTexture = createCircularGlowTexture('rgba(255, 215, 0, 0.6)');
+
+            const specialStarMat = new THREE.PointsMaterial({
+                color: 0xffd700, // Dorado estelar puro
+                size: 0.45,       // Tres veces más grande para capturar la mirada
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                map: goldStarTexture
+            });
+
+            specialStarMesh = new THREE.Points(specialStarGeo, specialStarMat);
+            
+            specialStarData = {
+                position: new THREE.Vector3(sX, sY, sZ),
+                element: specialDiv,
+                material: specialStarMat
+            };
+
+            // Se añade directamente a la escena o al grupo de rotación
+            messageStarsMesh.add(specialStarMesh);
+        }
+
+        function updateLabels() {
+            if (!messageStarsMesh) return;
+            const tempV = new THREE.Vector3();
+
+            // Actualizar mensajes estándar
+            messageStarsData.forEach((data) => {
+                tempV.copy(data.position);
+                tempV.applyAxisAngle(new THREE.Vector3(0, 1, 0), messageStarsMesh.rotation.y);
+
+                const distance = camera.position.distanceTo(tempV);
+
+                if (distance < 4.2) { 
+                    tempV.project(camera);
+                    const x = (tempV.x * .5 + .5) * window.innerWidth;
+                    const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+                    data.element.style.left = `${x}px`;
+                    data.element.style.top = `${y - 25}px`;
+                    data.element.style.opacity = '1';
+                    data.element.style.transform = 'translate(-50%, -50%) scale(1)';
+                } else {
+                    data.element.style.opacity = '0';
+                    data.element.style.transform = 'translate(-50%, -50%) scale(0.85)';
+                }
+            });
+
+            // Actualizar la estrella súper especial (Se ve desde más lejos y resalta de inmediato)
+            if (specialStarData) {
+                tempV.copy(specialStarData.position);
+                tempV.applyAxisAngle(new THREE.Vector3(0, 1, 0), messageStarsMesh.rotation.y);
+
+                const distance = camera.position.distanceTo(tempV);
+
+                // Sensibilidad mayor: se revela mucho antes que el resto al acercarse
+                if (distance < 5.2) { 
+                    tempV.project(camera);
+                    const x = (tempV.x * .5 + .5) * window.innerWidth;
+                    const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+                    specialStarData.element.style.left = `${x}px`;
+                    specialStarData.element.style.top = `${y - 32}px`; // Un poco más alta por su tamaño
+                    specialStarData.element.style.opacity = '1';
+                    specialStarData.element.style.transform = 'translate(-50%, -50%) scale(1)';
+                } else {
+                    specialStarData.element.style.opacity = '0';
+                    specialStarData.element.style.transform = 'translate(-50%, -50%) scale(0.85)';
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            const elapsedTime = clock.getElapsedTime();
+            const currentRotation = elapsedTime * 0.02;
+
+            if (galaxyPoints) {
+                galaxyPoints.rotation.y = currentRotation;
+                galaxyPoints.material.size = CONFIG.size * (Math.sin(elapsedTime * 1.5) * 0.1 + 0.95);
+            }
+            if (messageStarsMesh) {
+                messageStarsMesh.rotation.y = currentRotation;
+            }
+
+            // Animación exclusiva de respiración y titileo dorado para la estrella maestra
+            if (specialStarData && specialStarData.material) {
+                specialStarData.material.size = 0.45 + Math.sin(elapsedTime * 4.0) * 0.12;
+            }
+
+            updateLabels();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
